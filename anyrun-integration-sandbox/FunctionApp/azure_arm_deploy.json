@@ -1,372 +1,216 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "functionAppName": {
-            "type": "string",
-            "defaultValue": "ANYRUN-Sandbox-MDE-FA",
-            "metadata": {
-                "description": ""
-          }
-        },
-        "ANYRUN_API_KEY": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        },
-        "AzureBlobContainerName": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        },
-        "AzureClientID": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        },
-        "AzureClientSecret": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        },
-        "AzureStorageAccountKey": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        },
-        "AzureStorageAccountName": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        },
-        "AzureStorageConnectionString": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        },
-        "AzureTenantID": {
-          "type": "string",
-          "metadata": {
-            "description": ""
-          }
-        }
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "functionAppName": {
+      "type": "string",
+      "defaultValue": "ANYRUN-Sandbox-MDE-FA",
+      "metadata": {
+        "description": ""
+      }
     },
-    "variables": {},
-    "resources": [
-        {
-            "type": "Microsoft.Web/sites",
-            "apiVersion": "2024-11-01",
-            "name": "[parameters('functionAppName')]",
-            "location": "East US",
-            "kind": "functionapp,linux",
-            "identity": {
-                "type": "SystemAssigned"
+    "ANYRUN_API_KEY": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    },
+    "AppInsightsWorkspaceResourceID": {
+      "type": "string",
+      "metadata": {
+        "description": "Migrate Classic Application Insights to Log Analytic Workspace which is retiring by 29 Febraury 2024. Use 'Log Analytic Workspace-->Properties' blade having 'Resource ID' property value. This is a fully qualified resourceId which is in format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}'"
+      }
+    },
+    "AzureBlobContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    },
+    "AzureClientID": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    },
+    "AzureClientSecret": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    },
+    "AzureStorageAccountKey": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    },
+    "AzureStorageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    },
+    "AzureStorageConnectionString": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    },
+    "AzureTenantID": {
+      "type": "string",
+      "metadata": {
+        "description": ""
+      }
+    }
+  },
+  "variables": {
+    "deploymentStorageContainerName": "storageanyrun"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[parameters('functionAppName')]",
+      "location": "[resourceGroup().location]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "ApplicationId": "[parameters('functionAppName')]",
+        "WorkspaceResourceId": "[parameters('AppInsightsWorkspaceResourceID')]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('AzureStorageAccountName')]",
+      "location": "[resourceGroup().location]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "defaultToOAuthAuthentication": true,
+        "allowBlobPublicAccess": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}', parameters('AzureStorageAccountName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('AzureStorageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', parameters('AzureStorageAccountName'), 'default', variables('deploymentStorageContainerName'))]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices',  parameters('AzureStorageAccountName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', parameters('AzureStorageAccountName'), 'default', 'storageanyrunquarantine')]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices',  parameters('AzureStorageAccountName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('functionAppName')]",
+      "location": "[resourceGroup().location]",
+      "kind": "functionapp",
+      "sku": {
+        "tier": "FlexConsumption",
+        "name": "FC1"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-11-01",
+      "name": "[parameters('functionAppName')]",
+      "location": "[resourceGroup().location]",
+      "kind": "functionapp,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('functionAppName'))]",
+        "functionAppConfig": {
+          "deployment": {
+            "storage": {
+              "type": "blobContainer",
+              "value": "[concat(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('AzureStorageAccountName'))).primaryEndpoints.blob, variables('deploymentStorageContainerName'))]",
+              "authentication": {
+                "type": "SystemAssignedIdentity"
+              }
+            }
+          },
+          "scaleAndConcurrency": {
+            "maximumInstanceCount": 100,
+            "instanceMemoryMB": 4096
+          },
+          "runtime": {
+            "name": "python",
+            "version": "3.12"
+          }
+        },
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "ANYRUN_API_KEY",
+              "value": "[parameters('ANYRUN_API_KEY')]"
             },
-            "properties": {
-                "enabled": true,
-                "hostNameSslStates": [
-                    {
-                        "name": "[concat(parameters('functionAppName'), '-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net')]",
-                        "sslState": "Disabled",
-                        "hostType": "Standard"
-                    },
-                    {
-                        "name": "[concat(parameters('functionAppName'), '-bgcccacpg0cqgwhp.scm.eastus-01.azurewebsites.net')]",
-                        "sslState": "Disabled",
-                        "hostType": "Repository"
-                    }
-                ],
-                "serverFarmId": "[parameters('serverfarms_ASP_sentinel_b7d1_externalid')]",
-                "reserved": true,
-                "isXenon": false,
-                "hyperV": false,
-                "dnsConfiguration": {},
-                "outboundVnetRouting": {
-                    "allTraffic": false,
-                    "applicationTraffic": false,
-                    "contentShareTraffic": false,
-                    "imagePullTraffic": false,
-                    "backupRestoreTraffic": false
-                },
-                "siteConfig": {
-                    "numberOfWorkers": 1,
-                    "acrUseManagedIdentityCreds": false,
-                    "alwaysOn": false,
-                    "http20Enabled": false,
-                    "functionAppScaleLimit": 100,
-                    "minimumElasticInstanceCount": 0
-                },
-                "functionAppConfig": {
-                    "deployment": {
-                        "storage": {
-                            "type": "blobcontainer",
-                            "value": "[concat('https://storageanyrun.blob.core.windows.net/app-package-', parameters('functionAppName'), '-2d12f83')]",
-                            "authentication": {
-                                "type": "systemassignedidentity"
-                            }
-                        }
-                    },
-                    "runtime": {
-                        "name": "python",
-                        "version": "3.12"
-                    },
-                    "scaleAndConcurrency": {
-                        "maximumInstanceCount": 100,
-                        "instanceMemoryMB": 4096
-                    }
-                },
-                "scmSiteAlsoStopped": false,
-                "clientAffinityEnabled": false,
-                "clientAffinityProxyEnabled": false,
-                "clientCertEnabled": false,
-                "clientCertMode": "Required",
-                "hostNamesDisabled": false,
-                "ipMode": "IPv4",
-                "customDomainVerificationId": "BF2976FE2FD7A6AA31DAB70A6FC9AF36CC0EACBC7061A99FFC92EC1261DA1C29",
-                "containerSize": 1536,
-                "dailyMemoryTimeQuota": 0,
-                "httpsOnly": true,
-                "endToEndEncryptionEnabled": false,
-                "redundancyMode": "None",
-                "publicNetworkAccess": "Enabled",
-                "storageAccountRequired": false,
-                "keyVaultReferenceIdentity": "SystemAssigned",
-                "autoGeneratedDomainNameLabelScope": "TenantReuse"
+            {
+              "name": "AzureBlobContainerName",
+              "value": "[parameters('AzureBlobContainerName')]"
+            },
+            {
+              "name": "AzureClientID",
+              "value": "[parameters('AzureClientID')]"
+            },
+            {
+              "name": "AzureClientSecret",
+              "value": "[parameters('AzureClientSecret')]"
+            },
+            {
+              "name": "AzureStorageAccountKey",
+              "value": "[parameters('AzureStorageAccountKey')]"
+            },
+            {
+              "name": "AzureStorageAccountName",
+              "value": "[parameters('AzureStorageAccountName')]"
+            },
+            {
+              "name": "AzureStorageConnectionString",
+              "value": "[parameters('AzureStorageConnectionString')]"
+            },
+            {
+              "name": "AzureTenantID",
+              "value": "[parameters('AzureTenantID')]"
             }
-        },
-        {
-            "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/ftp')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "allow": false
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/scm')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "allow": false
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/config",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/web')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "numberOfWorkers": 1,
-                "defaultDocuments": [
-                    "Default.htm",
-                    "Default.html",
-                    "Default.asp",
-                    "index.htm",
-                    "index.html",
-                    "iisstart.htm",
-                    "default.aspx",
-                    "index.php"
-                ],
-                "netFrameworkVersion": "v4.0",
-                "requestTracingEnabled": false,
-                "remoteDebuggingEnabled": false,
-                "httpLoggingEnabled": false,
-                "acrUseManagedIdentityCreds": false,
-                "logsDirectorySizeLimit": 35,
-                "detailedErrorLoggingEnabled": false,
-                "publishingUsername": "REDACTED",
-                "scmType": "None",
-                "use32BitWorkerProcess": false,
-                "webSocketsEnabled": false,
-                "alwaysOn": false,
-                "managedPipelineMode": "Integrated",
-                "virtualApplications": [
-                    {
-                        "virtualPath": "/",
-                        "physicalPath": "site\\wwwroot",
-                        "preloadEnabled": false
-                    }
-                ],
-                "loadBalancing": "LeastRequests",
-                "experiments": {
-                    "rampUpRules": []
-                },
-                "autoHealEnabled": false,
-                "vnetRouteAllEnabled": false,
-                "vnetPrivatePortsCount": 0,
-                "publicNetworkAccess": "Enabled",
-                "cors": {
-                    "allowedOrigins": [
-                        "https://portal.azure.com"
-                    ],
-                    "supportCredentials": false
-                },
-                "localMySqlEnabled": false,
-                "managedServiceIdentityId": 19809,
-                "ipSecurityRestrictions": [
-                    {
-                        "ipAddress": "Any",
-                        "action": "Allow",
-                        "priority": 2147483647,
-                        "name": "Allow all",
-                        "description": "Allow all access"
-                    }
-                ],
-                "scmIpSecurityRestrictions": [
-                    {
-                        "ipAddress": "Any",
-                        "action": "Allow",
-                        "priority": 2147483647,
-                        "name": "Allow all",
-                        "description": "Allow all access"
-                    }
-                ],
-                "scmIpSecurityRestrictionsUseMain": false,
-                "http20Enabled": false,
-                "minTlsVersion": "1.2",
-                "scmMinTlsVersion": "1.2",
-                "ftpsState": "FtpsOnly",
-                "preWarmedInstanceCount": 0,
-                "functionAppScaleLimit": 100,
-                "functionsRuntimeScaleMonitoringEnabled": false,
-                "minimumElasticInstanceCount": 0,
-                "azureStorageAccounts": {},
-                "http20ProxyFlag": 0
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/deployments",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/82bc7dc0-0de2-4d15-8708-854e70cfc7fa')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "status": 4,
-                "deployer": "core_tools",
-                "start_time": "2025-08-11T07:04:09.4965299Z",
-                "end_time": "2025-08-11T07:05:29.6664739Z",
-                "active": false
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/deployments",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/a197dd1d-e282-46d5-a40d-c5e113ea41db')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "status": 0,
-                "deployer": "core_tools",
-                "start_time": "2025-07-31T11:11:57.2638232Z",
-                "active": false
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/deployments",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/aeee37da-a3da-4c1a-9bd9-4bb2dfb8d474')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "status": 4,
-                "deployer": "core_tools",
-                "start_time": "2025-08-11T11:08:02.8256929Z",
-                "end_time": "2025-08-11T11:09:26.4763834Z",
-                "active": true
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/deployments",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/b726eaac-1640-48ee-84f7-9b7c566fb811')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "status": 4,
-                "deployer": "core_tools",
-                "start_time": "2025-08-11T07:14:43.1276031Z",
-                "end_time": "2025-08-11T07:15:55.0130605Z",
-                "active": false
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/functions",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/', parameters('functionAppName'))]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "script_root_path_href": "https://anyrundefender-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net/admin/vfs/home/site/wwwroot/AnyRunDefender/",
-                "script_href": "https://anyrundefender-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net/admin/vfs/home/site/wwwroot/AnyRunDefender/anyrun_connector.py",
-                "config_href": "https://anyrundefender-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net/admin/vfs/home/site/wwwroot/AnyRunDefender/function.json",
-                "test_data_href": "https://anyrundefender-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net/admin/vfs/tmp/FunctionsData/AnyRunDefender.dat",
-                "href": "https://anyrundefender-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net/admin/functions/AnyRunDefender",
-                "config": {
-                    "scriptFile": "anyrun_connector.py",
-                    "bindings": [
-                        {
-                            "authLevel": "function",
-                            "type": "httpTrigger",
-                            "direction": "in",
-                            "name": "req",
-                            "methods": [
-                                "get",
-                                "post",
-                                "patch"
-                            ]
-                        },
-                        {
-                            "type": "http",
-                            "direction": "out",
-                            "name": "$return"
-                        }
-                    ]
-                },
-                "invoke_url_template": "https://anyrundefender-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net/api/anyrundefender",
-                "language": "python",
-                "isDisabled": false
-            }
-        },
-        {
-            "type": "Microsoft.Web/sites/hostNameBindings",
-            "apiVersion": "2024-11-01",
-            "name": "[concat(parameters('functionAppName'), '/', parameters('functionAppName'), '-bgcccacpg0cqgwhp.eastus-01.azurewebsites.net')]",
-            "location": "East US",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
-            ],
-            "properties": {
-                "siteName": "anyrundefender",
-                "hostNameType": "Verified"
-            }
+          ]
         }
-    ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', parameters('functionAppName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('AzureStorageAccountName'))]",
+        "[resourceId('Microsoft.Insights/components', parameters('functionAppName'))]"
+      ]
+    }
+  ]
 }
