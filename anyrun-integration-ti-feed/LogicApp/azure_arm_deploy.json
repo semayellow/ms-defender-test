@@ -1,0 +1,114 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+        "title": "The ANY.RUN Threat Intelligence Feed connector provides MS Defender XDR users with a continuously updated stream of fresh, accurate indicators of compromise, including malicious IPs, URLs, and domains",
+        "description": "This playbook runs every two ours.",
+        "prerequisites": "AnyRunDefender Function App",
+        "prerequisitesDeployTemplateFile": "../FunctionApp/azure_arm_deploy.json",
+        "postDeploymentSteps": ["None"],
+        "lastUpdateTime": "2025-06-22T00:00:00.000Z",
+        "entities": [""],
+        "tags": [""],
+        "support": {
+            "tier": "community"
+        },
+        "author": {
+            "name": "ANY.RUN integrations team"
+        }
+    },
+    "parameters": {
+        "logicAppName": {
+            "type": "string",
+            "defaultValue": "ANYRUN-Feeds-MDE-LA",
+            "metadata": {
+                "description": ""
+          }
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('logicAppName')]",
+            "location": "eastus",
+            "tags": {
+                "Resource": "Microsoft Defender XDR",
+                "PlaybookTrigger": "Incident",
+                "Custom": "ANYRUN",
+                "PlaybookType": "Enrichment"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "interval": 2,
+                                "frequency": "Hour",
+                                "timeZone": "Eastern Standard Time",
+                                "startTime": "2025-12-08T16:30:00Z"
+                            },
+                            "evaluatedRecurrence": {
+                                "interval": 2,
+                                "frequency": "Hour",
+                                "timeZone": "Eastern Standard Time",
+                                "startTime": "2025-12-08T16:30:00Z"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "Initialize_variables": {
+                            "runAfter": {},
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "feed_fetch_depth",
+                                        "type": "integer",
+                                        "value": 30
+                                    }
+                                ]
+                            }
+                        },
+                        "ANYRUNFeeds-AnyRunFeeds": {
+                            "runAfter": {
+                                "Initialize_variables": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Function",
+                            "inputs": {
+                                "body": {
+                                    "feed_fetch_depth": "@variables('feed_fetch_depth')"
+                                },
+                                "function": {
+                                    "id": "[concat(parameters('sites_ANYRUNFeeds_externalid'), '/functions/AnyRunFeeds')]"
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {}
+                    }
+                }
+            }
+        }
+    ]
+}
